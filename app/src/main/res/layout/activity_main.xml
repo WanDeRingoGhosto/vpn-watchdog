@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="24dp"
+    android:padding="20dp"
     android:background="#121212">
 
     <TextView
@@ -12,20 +12,20 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Проверка VPN..."
-        android:textSize="20sp"
+        android:textSize="19sp"
         android:textStyle="bold"
         android:textColor="#FFFFFF"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="10dp" />
 
     <TextView
         android:id="@+id/tvPing"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="-- мс"
-        android:textSize="48sp"
+        android:textSize="44sp"
         android:textStyle="bold"
         android:textColor="#4CAF50"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
     <TextView
         android:id="@+id/tvDetails"
@@ -35,19 +35,54 @@
         android:textSize="14sp"
         android:textColor="#AAAAAA"
         android:gravity="center"
-        android:layout_marginBottom="32dp" />
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/tvSpeed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="↓ 0 КБ/с  ↑ 0 КБ/с"
+        android:textSize="13sp"
+        android:textColor="#BBBBBB"
+        android:layout_marginBottom="18dp" />
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switchMonitoring"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Автопроверка включена"
+        android:textColor="#FFFFFF"
+        android:checked="true"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/tvIntervalLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Интервал: 5 сек"
+        android:textSize="14sp"
+        android:textColor="#DDDDDD"
+        android:layout_marginBottom="4dp" />
+
+    <SeekBar
+        android:id="@+id/seekInterval"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="14"
+        android:progress="4"
+        android:layout_marginBottom="20dp" />
 
     <Button
         android:id="@+id/btnCheckNow"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="52dp"
         android:text="Замерить пинг сейчас"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="10dp" />
 
     <Button
         android:id="@+id/btnOpenVpnSettings"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="52dp"
         android:text="Открыть настройки VPN"
         android:backgroundTint="#FF9800"
         android:textColor="#000000" />
