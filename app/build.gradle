@@ -3,6 +3,12 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def runNumberEnv = System.getenv("GITHUB_RUN_NUMBER")
+def rawRun = (runNumberEnv != null && runNumberEnv.isInteger())
+        ? runNumberEnv.toInteger()
+        : 34
+def patchNumber = Math.max(4, rawRun - 30)
+
 android {
     namespace 'com.example.vpnwatchdog'
     compileSdk 34
@@ -11,8 +17,8 @@ android {
         applicationId "com.example.vpnwatchdog"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode patchNumber
+        versionName "1.0.${patchNumber}"
     }
 
     buildTypes {
