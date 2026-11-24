@@ -4,8 +4,10 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.ConnectivityManager
@@ -32,7 +34,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
 
-        companion object {
+    companion object {
         private const val CHANNEL_ONGOING_ID = "vpn_watchdog_ongoing"
         private const val CHANNEL_ALERT_ID = "vpn_watchdog_alert"
         private const val NOTIF_ONGOING_ID = 1001
@@ -53,10 +55,10 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var isMonitoring = true
     private var intervalSeconds = 5
-    
+
     private var monitorStartTime: Long = System.currentTimeMillis()
     private var actionReceiverRegistered = false
-    
+
     private var lastRxBytes: Long = TrafficStats.getTotalRxBytes()
     private var lastTxBytes: Long = TrafficStats.getTotalTxBytes()
     private var lastSpeedTimeMs: Long = System.currentTimeMillis()
@@ -71,34 +73,20 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted && isMonitoring) {
-                updateOngoingNotification("Мониторинг запущен", "Интервал: $intervalSeconds сек")
+            updateOngoingNotification("Мониторинг запущен", "Интервал: $intervalSeconds сек")
+        }
+    }
+
+    private val pingRunnable = object : Runnable {
+        override fun run() {
+            if (isMonitoring) {
+                checkVpnAndPing()
+                handler.postDelayed(this, intervalSeconds * 1000L)
             }
         }
-    private fun registerActionReceiverIfNeeded() {
-        if (actionReceiverRegistered) return
-        val filter = android.content.IntentFilter().apply {
-            addAction(ACTION_PING_NOW)
-            addAction(ACTION_STOP_MONITORING)
-        }
-        ContextCompat.registerReceiver(
-            this,
-            actionReceiver,
-            filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        actionReceiverRegistered = true
     }
 
-    private fun unregisterActionReceiverIfNeeded() {
-        if (!actionReceiverRegistered) return
-        try {
-            unregisterReceiver(actionReceiver)
-        } catch (_: IllegalArgumentException) {
-        }
-        actionReceiverRegistered = false
-    }
-
-    private val actionReceiver = object : android.content.BroadcastReceiver() {
+    private val actionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_PING_NOW -> {
@@ -122,64 +110,76 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun actionPendingIntent(action: String, requestCode: Int): PendingIntent {
-        val intent = Intent(action).apply {
-            setPackage(packageName)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        createNotificationChannels()
+        registerActionReceiverIfNeeded()
+        requestNotificationPermissionIfNeeded()
+
+        tvVpnStatus = findViewById(R.id.tvVpnStatus)
+        tvPing = findViewById(R.id.tvPing)
+        tvDetails = findViewById(R.id.tvDetails)
+        tvSpeed = findViewById(R.id.tvSpeed)
+        tvIntervalLabel = findViewById(R.id.tvIntervalLabel)
+        switchMonitoring = findViewById(R.id.switchMonitoring)
+        seekInterval = findViewById(R.id.seekInterval)
+
+        loadSettings()
+        updateIntervalUi()
+
+        switchMonitoring.isChecked = isMonitoring
+        switchMonitoring.setOnCheckedChangeListener { _, isChecked ->
+            isMonitoring = isChecked
+            prefs.edit().putBoolean("is_monitoring", isMonitoring).apply()
+            handler.removeCallbacks(pingRunnable)
+
+            if (isMonitoring) {
+                monitorStartTime = System.currentTimeMillis()
+                requestNotificationPermissionIfNeeded()
+                tvDetails.text = "Замеряю..."
+                handler.post(pingRunnable)
+            } else {
+                cancelOngoingNotification()
+                setIdlePausedState()
+            }
         }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        return PendingIntent.getBroadcast(this, requestCode, intent, flags)
-    }
 
-    private fun updateOngoingNotification(title: String, text: String) {
-        if (!hasNotificationPermission()) return
+        seekInterval.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                intervalSeconds = progress + 1
+                updateIntervalUi()
+            }
 
-        val pingIntent = actionPendingIntent(ACTION_PING_NOW, 2001)
-        val stopIntent = actionPendingIntent(ACTION_STOP_MONITORING, 2002)
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ONGOING_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setContentIntent(openAppPendingIntent())
-            .setWhen(monitorStartTime)
-            .setShowWhen(false)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .addAction(0, "Пинг", pingIntent)
-            .addAction(0, "Стоп", stopIntent)
-            .build()
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                prefs.edit().putInt("interval_seconds", intervalSeconds).apply()
+                if (isMonitoring) {
+                    handler.removeCallbacks(pingRunnable)
+                    handler.postDelayed(pingRunnable, intervalSeconds * 1000L)
+                }
+            }
+        })
 
-        try {
-            NotificationManagerCompat.from(this).notify(NOTIF_ONGOING_ID, notification)
-        } catch (_: SecurityException) {
+        findViewById<Button>(R.id.btnCheckNow).setOnClickListener {
+            tvDetails.text = "Замеряю..."
+            checkVpnAndPing()
         }
-    }
 
-    private fun cancelOngoingNotification() {
-        NotificationManagerCompat.from(this).cancel(NOTIF_ONGOING_ID)
-    }
+        findViewById<Button>(R.id.btnOpenVpnSettings).setOnClickListener {
+            try {
+                startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+            }
+        }
 
-    private fun cancelAlertNotification() {
-        NotificationManagerCompat.from(this).cancel(NOTIF_ALERT_ID)
-    }
-
-    private fun showPopupAlert(title: String, message: String) {
-        if (!hasNotificationPermission()) return
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ALERT_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setAutoCancel(true)
-            .setContentIntent(openAppPendingIntent())
-            .build()
-
-        try {
-            NotificationManagerCompat.from(this).notify(NOTIF_ALERT_ID, notification)
-        } catch (_: SecurityException) {
+        if (isMonitoring) {
+            handler.post(pingRunnable)
+        } else {
+            setIdlePausedState()
         }
     }
 
@@ -187,6 +187,30 @@ class MainActivity : AppCompatActivity() {
         unregisterActionReceiverIfNeeded()
         handler.removeCallbacks(pingRunnable)
         super.onDestroy()
+    }
+
+    private fun registerActionReceiverIfNeeded() {
+        if (actionReceiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(ACTION_PING_NOW)
+            addAction(ACTION_STOP_MONITORING)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            actionReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        actionReceiverRegistered = true
+    }
+
+    private fun unregisterActionReceiverIfNeeded() {
+        if (!actionReceiverRegistered) return
+        try {
+            unregisterReceiver(actionReceiver)
+        } catch (_: IllegalArgumentException) {
+        }
+        actionReceiverRegistered = false
     }
 
     private fun setIdlePausedState() {
@@ -244,12 +268,12 @@ class MainActivity : AppCompatActivity() {
     )
 
     private fun getNetworkState(): NetworkState {
-        val cn = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cn.activeNetwork ?: return NetworkState(
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = cm.activeNetwork ?: return NetworkState(
             hasInternetCapability = false,
             isVpnActive = false
         )
-        val caps = cn.getNetworkCapabilities(activeNetwork) ?: return NetworkState(
+        val caps = cm.getNetworkCapabilities(activeNetwork) ?: return NetworkState(
             hasInternetCapability = false,
             isVpnActive = false
         )
@@ -264,7 +288,7 @@ class MainActivity : AppCompatActivity() {
 
         when {
             !state.hasInternetCapability && !state.isVpnActive -> {
-                tvVpnStatus.text = "🌐 Нет интернета"
+                tvVpnStatus.text = "🔴 Нет интернета"
                 tvVpnStatus.setTextColor(Color.parseColor("#FF5722"))
                 showDeadState("Нет активного подключения к сети", "NO_INTERNET")
                 return
@@ -294,9 +318,9 @@ class MainActivity : AppCompatActivity() {
                 conn.disconnect()
 
                 runOnUiThread {
-                        if (code == 204 || code == 200) {
-                             lastAlertSignature = null
-                             cancelAlertNotification()
+                    if (code == 204 || code == 200) {
+                        lastAlertSignature = null
+                        cancelAlertNotification()
 
                         tvPing.text = "$ping мс"
                         val detailText = when {
@@ -308,10 +332,12 @@ class MainActivity : AppCompatActivity() {
                                     "Соединение отличное (без VPN)"
                                 }
                             }
+
                             ping < 1200 -> {
                                 tvPing.setTextColor(Color.parseColor("#FFC107"))
                                 "Есть задержка, но работает"
                             }
+
                             else -> {
                                 tvPing.setTextColor(Color.parseColor("#FF5722"))
                                 "Сильно тормозит! Пора менять VPN"
@@ -413,15 +439,31 @@ class MainActivity : AppCompatActivity() {
         return PendingIntent.getActivity(this, 0, intent, flags)
     }
 
+    private fun actionPendingIntent(action: String, requestCode: Int): PendingIntent {
+        val intent = Intent(action).apply {
+            setPackage(packageName)
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getBroadcast(this, requestCode, intent, flags)
+    }
+
     private fun updateOngoingNotification(title: String, text: String) {
         if (!hasNotificationPermission()) return
+
+        val pingIntent = actionPendingIntent(ACTION_PING_NOW, 2001)
+        val stopIntent = actionPendingIntent(ACTION_STOP_MONITORING, 2002)
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ONGOING_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(openAppPendingIntent())
+            .setWhen(monitorStartTime)
+            .setShowWhen(false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .addAction(0, "Пинг", pingIntent)
+            .addAction(0, "Стоп", stopIntent)
             .build()
 
         try {
@@ -434,15 +476,20 @@ class MainActivity : AppCompatActivity() {
         NotificationManagerCompat.from(this).cancel(NOTIF_ONGOING_ID)
     }
 
+    private fun cancelAlertNotification() {
+        NotificationManagerCompat.from(this).cancel(NOTIF_ALERT_ID)
+    }
+
     private fun showPopupAlert(title: String, message: String) {
         if (!hasNotificationPermission()) return
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ALERT_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
             .setContentIntent(openAppPendingIntent())
             .build()
@@ -451,12 +498,5 @@ class MainActivity : AppCompatActivity() {
             NotificationManagerCompat.from(this).notify(NOTIF_ALERT_ID, notification)
         } catch (_: SecurityException) {
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        isMonitoring = false
-        handler.removeCallbacks(pingRunnable)
-        cancelOngoingNotification()
     }
 }
