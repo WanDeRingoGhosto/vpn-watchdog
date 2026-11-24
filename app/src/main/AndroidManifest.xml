@@ -12,10 +12,6 @@
         android:label="Black Fox Guardian"
         android:supportsRtl="true"
         android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar">
-         <receiver
-            android:name=".MainActivity$NotificationActionReceiver"
-            android:enabled="true"
-            android:exported="false" />
         
          <activity
             android:name=".MainActivity"
@@ -28,4 +24,3 @@
     </application>
 
 </manifest>
-
