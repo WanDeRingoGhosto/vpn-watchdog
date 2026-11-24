@@ -71,6 +71,9 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted && isMonitoring) {
+                updateOngoingNotification("Мониторинг запущен", "Интервал: $intervalSeconds сек")
+            }
+        }
     private fun registerActionReceiverIfNeeded() {
         if (actionReceiverRegistered) return
         val filter = android.content.IntentFilter().apply {
@@ -180,19 +183,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-        if (isMonitoring) {
-            handler.post(pingRunnable)
-        } else {
-            setIdlePausedState()
-        }
-    }
-
     override fun onDestroy() {
         unregisterActionReceiverIfNeeded()
+        handler.removeCallbacks(pingRunnable)
         super.onDestroy()
-     
-        }
-    
+    }
+
     private fun setIdlePausedState() {
         tvPing.text = "-- мс"
         tvPing.setTextColor(Color.parseColor("#888888"))
