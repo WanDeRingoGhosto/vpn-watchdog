@@ -77,7 +77,7 @@ class WatchdogTileService : TileService() {
         val interval = prefs.getInt("interval_seconds", 5).coerceIn(1, 15)
 
         tile.icon = Icon.createWithResource(this, R.drawable.ic_fox_tile)
-        tile.label = getString(R.string.app_name)
+        tile.label = "Black Fox Guardian"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = if (enabled) "Активен • ${interval} сек" else "Выключен"
         }
