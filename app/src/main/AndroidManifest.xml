@@ -29,6 +29,18 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".WatchdogTileService"
+            android:icon="@drawable/ic_fox_tile"
+            android:label="Black Fox Guardian"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+
     </application>
 
 </manifest>
