@@ -1,4 +1,4 @@
-package com.example.vpnwatchdog
+package com.wdrg.blackfoxguardian
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -40,8 +40,8 @@ class MainActivity : AppCompatActivity() {
         private const val NOTIF_ONGOING_ID = 1001
         private const val NOTIF_ALERT_ID = 1002
 
-        private const val ACTION_PING_NOW = "com.example.vpnwatchdog.ACTION_PING_NOW"
-        private const val ACTION_STOP_MONITORING = "com.example.vpnwatchdog.ACTION_STOP_MONITORING"
+        private const val ACTION_PING_NOW = "com.wdrg.blackfoxguardian.ACTION_PING_NOW"
+        private const val ACTION_STOP_MONITORING = "com.wdrg.blackfoxguardian.ACTION_STOP_MONITORING"
     }
 
     private lateinit var tvVpnStatus: TextView
