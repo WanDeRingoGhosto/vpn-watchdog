@@ -6,26 +6,52 @@ plugins {
 def runNumberEnv = System.getenv("GITHUB_RUN_NUMBER")
 def rawRun = (runNumberEnv != null && runNumberEnv.isInteger())
         ? runNumberEnv.toInteger()
-        : 34
-def patchNumber = Math.max(4, rawRun - 30)
+        : 36
+def buildNum = 100 + Math.max(6, rawRun - 30)
+def majorVer = (int) (buildNum / 100)
+def minorVer = (int) ((buildNum / 10) % 10)
+def patchVer = buildNum % 10
+def appVersionName = "${majorVer}.${minorVer}.${patchVer}"
 
 android {
-    namespace 'com.example.vpnwatchdog'
+    namespace 'com.wdrg.blackfoxguardian'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.example.vpnwatchdog"
+        applicationId "com.wdrg.blackfoxguardian"
         minSdk 26
         targetSdk 34
-        versionCode patchNumber
-        versionName "1.0.${patchNumber}"
+        versionCode buildNum
+        versionName appVersionName
+    }
+
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("KEYSTORE_PATH")
+            if (ksPath != null && file(ksPath).exists()) {
+                storeFile file(ksPath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            if (System.getenv("KEYSTORE_PATH") != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "BlackFoxGuardian-v${variant.versionName}.apk"
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
