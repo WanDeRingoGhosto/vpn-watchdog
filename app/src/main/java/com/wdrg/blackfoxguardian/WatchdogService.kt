@@ -380,7 +380,7 @@ class WatchdogService : Service() {
 
     private fun buildOngoingNotification(title: String, text: String) =
         NotificationCompat.Builder(this, CHANNEL_ONGOING_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_fox_tile)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(openAppPendingIntent())
@@ -412,7 +412,7 @@ class WatchdogService : Service() {
     private fun showPopupAlert(title: String, message: String) {
         if (!hasNotificationPermission()) return
         val notification = NotificationCompat.Builder(this, CHANNEL_ALERT_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_fox_tile)
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
