@@ -1,0 +1,36 @@
+name: Generate Keystore Once
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Generate Keystore and Base64
+        run: |
+          keytool -genkeypair -v \
+            -keystore wdrg_release.jks \
+            -alias wdrg_key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass wdrg2026 \
+            -keypass wdrg2026 \
+            -dname "CN=WDRG, OU=Dev, O=WDRG, L=Unknown, ST=Unknown, C=RU"
+          base64 -w 0 wdrg_release.jks > keystore_base64.txt
+
+      - name: Upload Keystore Secret
+        uses: actions/upload-artifact@v4
+        with:
+          name: wdrg-keystore-secret
+          path: |
+            keystore_base64.txt
+            wdrg_release.jks
+          retention-days: 1
