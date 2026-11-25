@@ -382,9 +382,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun triggerAlertIfNew(code: String, message: String) {
         if (lastAlertSignature == code) return
-        lastAlertSignature = code
-        showPopupAlert("Black Fox Guardian: отвал связи", message)
-    }
+            lastAlertSignature = code
+        val appName = applicationInfo.loadLabel(packageManager).toString()
+        val cleanMessage = message.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+            showPopupAlert("$appName: Отвал", cleanMessage)
+}
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
