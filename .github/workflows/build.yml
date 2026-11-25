@@ -18,10 +18,13 @@ jobs:
           java-version: '17'
 
       - name: Decode Keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/wdrg_release.jks
-          echo "KEYSTORE_PATH=$RUNNER_TEMP/wdrg_release.jks" >> $GITHUB_ENV
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 --decode > $RUNNER_TEMP/wdrg_release.jks
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/wdrg_release.jks" >> $GITHUB_ENV
+          fi
 
       - name: Accept SDK licenses and build APK
         env:
